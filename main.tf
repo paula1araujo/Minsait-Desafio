@@ -2,22 +2,6 @@ provider "azurerm" {
   features {}
 }
 
-variable "location" {
-  default = "Canada Central"
-}
-
-variable "resource_group_name" {
-  default = "wordpress-rg"
-}
-
-variable "admin_username" {
-  default = "adminuser"
-}
-
-variable "admin_password" {
-  default = "adminpassword"
-}
-
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
