@@ -8,28 +8,21 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  name                = "wordpress-vnet"
-  resource_group_name = azurerm_resource_group.rg.name
+  name                = var.vnet_name
+  address_space       = [var.vnet_address_space]
   location            = azurerm_resource_group.rg.location
-  address_space       = ["10.0.0.0/16"]
+  resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_subnet" "subnet" {
-  name                 = "default"
+  name                 = var.subnet_name
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-resource "azurerm_public_ip" "public_ip" {
-  name                = "wordpress-public-ip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Dynamic"
+  address_prefixes     = [var.subnet_address_prefix]
 }
 
 resource "azurerm_network_interface" "nic" {
-  name                = "wordpress-nic"
+  name                = var.nic_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -37,18 +30,36 @@ resource "azurerm_network_interface" "nic" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.public_ip.id
   }
 }
 
+resource "azurerm_public_ip" "public_ip" {
+  name                = var.public_ip_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Dynamic"
+}
+
 resource "azurerm_network_security_group" "nsg" {
-  name                = "wordpress-nsg"
+  name                = var.nsg_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
-    name                       = "AllowHTTP"
-    priority                   = 100
+    name                       = "SSH"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "HTTP"
+    priority                   = 1002
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -59,57 +70,40 @@ resource "azurerm_network_security_group" "nsg" {
   }
 }
 
-resource "azurerm_virtual_machine" "vm" {
-  name                  = "wordpress-vm"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  network_interface_ids = [azurerm_network_interface.nic.id]
-  vm_size               = "Standard_B1s" # Verifique se esta SKU está disponível na região "Canada Central"
+resource "azurerm_network_interface_security_group_association" "nsg_association" {
+  network_interface_id      = azurerm_network_interface.nic.id
+  network_security_group_id = azurerm_network_security_group.nsg.id
+}
 
-  storage_os_disk {
-    name              = "osdisk"
-    caching           = "ReadWrite"
-    create_option     = "FromImage"
-    managed_disk_type = "Standard_LRS"
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = var.vm_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = var.vm_size
+  admin_username      = var.admin_username
+
+  network_interface_ids = [
+    azurerm_network_interface.nic.id,
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
   }
 
-  storage_image_reference {
+  source_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
     sku       = "18.04-LTS"
     version   = "latest"
   }
 
-  os_profile {
-    computer_name  = "wordpressvm"
-    admin_username = var.admin_username
-    admin_password = "P@ssw0rd2024!"
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = file(var.ssh_public_key)
   }
 
-  os_profile_linux_config {
-    disable_password_authentication = false
-  }
+  disable_password_authentication = true
 
-  tags = {
-    environment = "Development"
-  }
-}
-
-resource "azurerm_virtual_machine_extension" "custom_script" {
-  name                 = "install-docker"
-  virtual_machine_id   = azurerm_virtual_machine.vm.id
-  publisher            = "Microsoft.Azure.Extensions"
-  type                 = "CustomScript"
-  type_handler_version = "2.0"
-  settings = <<SETTINGS
-    {
-        "commandToExecute": "sh /var/lib/waagent/custom-script/download/0/install_docker.sh"
-    }
-SETTINGS
-
-  protected_settings = <<PROTECTED_SETTINGS
-    {
-        "fileUris": ["https://<URL_TO_YOUR_SCRIPT>/install_docker.sh"]
-    }
-PROTECTED_SETTINGS
+  custom_data = filebase64("${path.module}/cloud-init.yaml")
 }
