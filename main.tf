@@ -1,5 +1,5 @@
 provider "azurerm" {
-  features = {}
+  features {}
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -113,3 +113,4 @@ SETTINGS
     }
 PROTECTED_SETTINGS
 }
+
