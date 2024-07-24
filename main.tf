@@ -3,26 +3,26 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "paula-azure-rg"
-  location = "Canada Central"
+  name     = "paula-ara-rg"
+  location = "West Europe"
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  name                = "paula-azure-vnet"
+  name                = "paula-ara-vnet"
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_subnet" "subnet" {
-  name                 = "paula-azure-subnet"
+  name                 = "paula-ara-subnet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_network_interface" "nic" {
-  name                = "paula-azure-nic"
+  name                = "paula-ara-nic"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -30,50 +30,24 @@ resource "azurerm_network_interface" "nic" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.public_ip.id
   }
 }
 
-resource "azurerm_virtual_machine" "vm" {
-  name                  = "paula-azure-vm"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  network_interface_ids = [azurerm_network_interface.nic.id]
-  vm_size               = "Standard_B1s"
-
-  os_profile {
-    computer_name  = "paula-azure-vm"
-    admin_username = "azureuser"
-    admin_password = "P@ssw0rd1234!"
-  }
-
-  os_profile_linux_config {
-    disable_password_authentication = false
-  }
-
-  storage_os_disk {
-    name              = "paula-azure-osdisk"
-    caching           = "ReadWrite"
-    create_option     = "FromImage"
-    managed_disk_type = "Standard_LRS"
-  }
-
-  storage_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
-    version   = "latest"
-  }
-
-  custom_data = filebase64("scripts/install_docker.sh")
+resource "azurerm_public_ip" "public_ip" {
+  name                = "paula-ara-public-ip"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Dynamic"
 }
 
 resource "azurerm_network_security_group" "nsg" {
-  name                = "paula-azure-nsg"
+  name                = "paula-ara-nsg"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
-    name                       = "Allow_SSH"
+    name                       = "SSH"
     priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
@@ -85,7 +59,7 @@ resource "azurerm_network_security_group" "nsg" {
   }
 
   security_rule {
-    name                       = "Allow_HTTP"
+    name                       = "HTTP"
     priority                   = 1002
     direction                  = "Inbound"
     access                     = "Allow"
@@ -97,11 +71,44 @@ resource "azurerm_network_security_group" "nsg" {
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "nic_nsg" {
+resource "azurerm_network_interface_security_group_association" "nsg_association" {
   network_interface_id      = azurerm_network_interface.nic.id
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-output "public_ip_address" {
-  value = azurerm_virtual_machine.vm.public_ip_address
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = "paula-ara-vm"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = "Standard_B1s"
+  admin_username      = "paula"
+
+  network_interface_ids = [
+    azurerm_network_interface.nic.id,
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  admin_ssh_key {
+    username   = "paula"
+    public_key = file("~/.ssh/id_rsa.pub")
+  }
+
+  disable_password_authentication = true
+
+  custom_data = filebase64("cloud-init.txt")
+}
+
+output "public_ip" {
+  value = azurerm_public_ip.public_ip.ip_address
 }
