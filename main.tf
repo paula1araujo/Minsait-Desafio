@@ -75,35 +75,38 @@ resource "azurerm_network_interface_security_group_association" "nsg_association
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-resource "azurerm_linux_virtual_machine" "vm" {
-  name                = var.vm_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  size                = var.vm_size
-  admin_username      = var.admin_username
+resource "azurerm_virtual_machine" "vm" {
+  name                  = "wordpress-vm"
+  location              = azurerm_resource_group.rg.location
+  resource_group_name   = azurerm_resource_group.rg.name
+  network_interface_ids = [azurerm_network_interface.nic.id]
+  vm_size               = "Standard_B1s"
 
-  network_interface_ids = [
-    azurerm_network_interface.nic.id,
-  ]
-
-  os_disk {
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
+  storage_os_disk {
+    name              = "osdisk"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
   }
 
-  source_image_reference {
+  storage_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
     sku       = "18.04-LTS"
     version   = "latest"
   }
 
-  admin_ssh_key {
-    username   = var.admin_username
-    public_key = file(var.ssh_public_key)
+  os_profile {
+    computer_name  = "wordpressvm"
+    admin_username = var.admin_username
+    admin_password = "P@ssword1234!"
   }
 
-  disable_password_authentication = true
+  os_profile_linux_config {
+    disable_password_authentication = false
+  }
 
-  custom_data = filebase64("${path.module}/cloud-init.yaml")
+  tags = {
+    environment = "Development"
+  }
 }
