@@ -1,17 +1,16 @@
-# Terraform Azure VM with WordPress
+# Terraform WordPress Setup
 
-Este repositório contém um script Terraform para criar uma máquina virtual no Azure, configurar Docker na VM e subir um container com WordPress.
+Este projeto configura uma VM na Azure que instala Docker e sobe um container com WordPress.
 
-## Pré-requisitos
+## Requisitos
 
+- Terraform instalado
 - Conta na Azure
-- [Terraform](https://www.terraform.io/downloads.html) instalado na sua máquina
-- Chave SSH gerada (public key)
+- Credenciais configuradas (usando Azure CLI ou variáveis de ambiente)
 
-## Passos para executar o código
+## Instruções
 
-1. Clone o repositório:
-
-   ```sh
-   git clone https://github.com/SEU_USUARIO/terraform-azure-vm-wordpress.git
-   cd terraform-azure-vm-wordpress
+1. Clone este repositório:
+   ```bash
+   git clone https://github.com/<your_username>/terraform-wordpress-setup.git
+   cd terraform-wordpress-setup
