@@ -2,6 +2,22 @@ provider "azurerm" {
   features {}
 }
 
+variable "location" {
+  default = "Canada Central"
+}
+
+variable "resource_group_name" {
+  default = "wordpress-rg"
+}
+
+variable "admin_username" {
+  default = "adminuser"
+}
+
+variable "admin_password" {
+  default = "adminpassword"
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
@@ -64,7 +80,7 @@ resource "azurerm_virtual_machine" "vm" {
   location              = azurerm_resource_group.rg.location
   resource_group_name   = azurerm_resource_group.rg.name
   network_interface_ids = [azurerm_network_interface.nic.id]
-  vm_size               = "Standard_B1s"
+  vm_size               = "Standard_B1s" # Verifique se esta SKU está disponível na região "Canada Central"
 
   storage_os_disk {
     name              = "osdisk"
@@ -113,4 +129,3 @@ SETTINGS
     }
 PROTECTED_SETTINGS
 }
-
