@@ -83,7 +83,7 @@ resource "azurerm_virtual_machine" "vm" {
   os_profile {
     computer_name  = "wordpressvm"
     admin_username = var.admin_username
-    admin_password = P@ssw0rd2024!
+    admin_password = "P@ssw0rd2024!"
   }
 
   os_profile_linux_config {
